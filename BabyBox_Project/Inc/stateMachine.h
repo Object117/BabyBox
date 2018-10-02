@@ -16,6 +16,7 @@ typedef enum {
 	CONFIRM		,
 	EXIT		,
 	EMERGENCY	,
+	RECOVERY	,
 	NONE_STATE
 } MACHINE_STATE;
 
@@ -51,6 +52,7 @@ BABY_ACTION baby_state;
 USER_ACTION* changeingState;
 
 USER_ACTION* initialize_state(void);
+USER_ACTION* recovery_state(void);
 USER_ACTION* change_state();
 
 void STANDBY_inner_door_open(void);
@@ -101,4 +103,11 @@ void EMER_extdoor_open(void);
 void EMER_extdoor_close(void);
 void EMER_baby_in(void);
 void EMER_baby_none(void);
+
+void RECOVERY_inner_door_open(void);
+void RECOVERY_inner_door_close(void);
+void RECOVERY_extdoor_open(void);
+void RECOVERY_extdoor_close(void);
+void RECOVERY_baby_in(void);
+void RECOVERY_baby_none(void);
 #endif /* STATEMACHINE_H_ */

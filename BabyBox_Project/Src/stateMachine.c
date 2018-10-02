@@ -8,11 +8,11 @@
 #include"usart.h"
 #include "device_led.h"
 #include "device_relay.h"
+#include "device_buzzer.h"
 
 uint8_t TxBuffer1[] = "in doing_ready_state/n";
 uint8_t TxBuffer2[] = "in doing_running_state/n";
 uint8_t Testing[] = "in Testing/n";
-
 
 USER_ACTION standby_functions = {STANDBY	,
 								STANDBY_inner_door_open	,
@@ -77,6 +77,15 @@ USER_ACTION emergency_functions = {EMERGENCY	,
 							EMER_baby_none
 };
 
+USER_ACTION recovery_functions = {RECOVERY	,
+							RECOVERY_inner_door_open	,
+							RECOVERY_inner_door_close	,
+							RECOVERY_extdoor_open	,
+							RECOVERY_extdoor_close	,
+							RECOVERY_baby_in	,
+							RECOVERY_baby_none
+};
+
 USER_ACTION* tStandby_state = &standby_functions;
 USER_ACTION* tReady_state = &ready_functions;
 USER_ACTION* tEnter_state = &enter_functions;
@@ -84,9 +93,14 @@ USER_ACTION* tProtection_state = &protection_functions;
 USER_ACTION* tConfirm_state = &confirm_functions;
 USER_ACTION* tExit_state = &exit_functions;
 USER_ACTION* tEmergency_state = &emergency_functions;
+USER_ACTION* tRecovery_state = &recovery_functions;
 
 USER_ACTION* initialize_state(void) {
 	return tStandby_state;
+}
+
+USER_ACTION* recovery_state(void) {
+	return tRecovery_state;
 }
 
 USER_ACTION* change_state(void) {
@@ -105,15 +119,17 @@ USER_ACTION* change_state(void) {
  */
 
 void STANDBY_inner_door_open(void) {
-
+//	printf("State : STANDBY\n");
 }
 
 void STANDBY_inner_door_close(void) {
-//	LED_ON(LED_RED);
-//	LED_OFF(LED_GREEN);
-//	LED_OFF(LED_BLUE);
-//	LED_OFF(LED_ORANGE);
+	LED_OFF(RED_LED);
+	LED_OFF(GREEN_LED);
+	LED_ON(BLUE_LED);
 	light_off();
+	unlock_door();
+	baby_state = BABY_NONE;		// Initialize
+	Buzzer_Off(BUZZER_EXTERNAL);
 }
 
 void STANDBY_extdoor_open(void) {
@@ -142,7 +158,7 @@ void STANDBY_baby_none(void) {
  * __________________________________________
  */
 void READY_inner_door_open(void) {
-
+//	printf("State : READY\n");
 }
 
 void READY_inner_door_close(void) {
@@ -150,10 +166,10 @@ void READY_inner_door_close(void) {
 }
 
 void READY_extdoor_open(void) {
-//	LED_OFF(LED_RED);
-//	LED_ON(LED_GREEN);
-//	LED_OFF(LED_BLUE);
-//	LED_OFF(LED_ORANGE);
+	LED_OFF(RED_LED);
+	LED_OFF(GREEN_LED);
+	LED_ON(BLUE_LED);
+	Buzzer_Off(BUZZER_EXTERNAL);
 	light_on();
 }
 
@@ -181,7 +197,7 @@ void READY_baby_none(void) {
  * __________________________________________
  */
 void ENTER_inner_door_open(void) {
-
+//	printf("State : ENTER\n");
 }
 
 void ENTER_inner_door_close(void) {
@@ -193,10 +209,10 @@ void ENTER_extdoor_open(void) {
 }
 
 void ENTER_extdoor_close(void) {
-//	LED_OFF(LED_RED);
-//	LED_OFF(LED_GREEN);
-//	LED_ON(LED_BLUE);
-//	LED_OFF(LED_ORANGE);
+	LED_OFF(RED_LED);
+	LED_ON(GREEN_LED);
+	LED_OFF(BLUE_LED);
+	Buzzer_Off(BUZZER_EXTERNAL);
 	if(extdoor_status == EXT_DOOR_CLOSE) {
 		changeingState = tProtection_state;
 	}
@@ -218,11 +234,12 @@ void ENTER_baby_none(void) {
  * __________________________________________
  */
 void PROTECTION_inner_door_open(void) {
-//	LED_OFF(LED_RED);
-//	LED_OFF(LED_GREEN);
-//	LED_OFF(LED_BLUE);
-//	LED_ON(LED_ORANGE);
+//	printf("State : PROTECTION\n");
+	LED_OFF(RED_LED);
+	LED_ON(GREEN_LED);
+	LED_OFF(BLUE_LED);
 	baby_state = BABY_NONE;		// Initialize
+	Buzzer_Off(BUZZER_EXTERNAL);
 	lock_door();
 	if(innerdoor_state == INNER_DOOR_OPEN) {
 		changeingState = tConfirm_state;
@@ -234,7 +251,7 @@ void PROTECTION_inner_door_close(void) {
 }
 
 void PROTECTION_extdoor_open(void) {
-#if 0	// for the 1st TEST - ORIG ACTIVE
+#if 1	// for the 1st TEST - ORIG ACTIVE
 	if(extdoor_status == EXT_DOOR_OPEN) {
 		changeingState = tEmergency_state;
 	}
@@ -261,11 +278,11 @@ void PROTECTION_baby_none(void) {
  * __________________________________________
  */
 void CONFIRM_inner_door_open(void) {
-
+//	printf("State : CONFIRM\n");
 }
 
 void CONFIRM_inner_door_close(void) {
-
+	Buzzer_Off(BUZZER_EXTERNAL);
 	if(innerdoor_state == INNER_DOOR_CLOSE) {
 		changeingState = tProtection_state;
 	}
@@ -284,10 +301,7 @@ void CONFIRM_baby_in(void) {
 }
 
 void CONFIRM_baby_none(void) {
-//	LED_ON(LED_RED);
-//	LED_ON(LED_GREEN);
-//	LED_OFF(LED_BLUE);
-//	LED_OFF(LED_ORANGE);
+
 	if(baby_state == BABY_IN) {		// <<---- Should be modify
 		changeingState = tExit_state;
 	}
@@ -301,14 +315,14 @@ void CONFIRM_baby_none(void) {
  * __________________________________________
  */
 void EXIT_inner_door_open(void) {
-
+//	printf("State : EXIT\n");
 }
 
 void EXIT_inner_door_close(void) {
-//	LED_OFF(LED_RED);
-//	LED_ON(LED_GREEN);
-//	LED_ON(LED_BLUE);
-//	LED_OFF(LED_ORANGE);
+	LED_OFF(RED_LED);
+	LED_OFF(GREEN_LED);
+	LED_ON(BLUE_LED);
+	Buzzer_Off(BUZZER_EXTERNAL);
 	unlock_door();
 	baby_state = BABY_NONE;		// Initialize
 	if(innerdoor_state == INNER_DOOR_CLOSE) {		// <<---- Should be modify
@@ -333,14 +347,14 @@ void EXIT_baby_none(void) {
 }
 
 /*
- * EMERGENCY State		(NORMAL)
+ * EMERGENCY State		(EXCEPTION)
  * --> Inner Door 'CLOSE'
  * --> Ext Door 'OPEN'	// FORCE
  * --> Baby 'NONE'		// hijacking??
  * __________________________________________
  */
 void EMER_inner_door_open(void) {
-
+//	printf("State : EMERGENCY !!! \n");
 }
 
 void EMER_inner_door_close(void) {
@@ -348,7 +362,11 @@ void EMER_inner_door_close(void) {
 }
 
 void EMER_extdoor_open(void) {
-//	LED_ALL_BLINK(LED_RED, LED_GREEN, LED_BLUE, LED_ORANGE);
+	LED_ON(RED_LED);
+	LED_OFF(GREEN_LED);
+	LED_OFF(BLUE_LED);
+	Buzzer_On(BUZZER_EXTERNAL);
+	baby_state = BABY_NONE;		// Initialize
 }
 
 void EMER_extdoor_close(void) {
@@ -360,5 +378,43 @@ void EMER_baby_in(void) {
 }
 
 void EMER_baby_none(void) {
+
+}
+
+/*
+ * RECOVERY State		(EXCEPTION)
+ * --> Inner Door 'CLOSE'
+ * --> Ext Door 'OPEN'	// will CLOSE
+ * --> Baby 'NONE'		//
+ * __________________________________________
+ */
+void RECOVERY_inner_door_open(void) {
+//	printf("State : RECOVERY\n");
+}
+
+void RECOVERY_inner_door_close(void) {
+
+}
+
+void RECOVERY_extdoor_open(void) {
+
+}
+
+void RECOVERY_extdoor_close(void) {
+	LED_ON(RED_LED);
+	LED_OFF(GREEN_LED);
+	LED_ON(BLUE_LED);
+	Buzzer_Off(BUZZER_EXTERNAL);
+	unlock_door();
+	if(extdoor_status == EXT_DOOR_CLOSE) {
+		changeingState = tStandby_state;
+	}
+}
+
+void RECOVERY_baby_in(void) {
+
+}
+
+void RECOVERY_baby_none(void) {
 
 }

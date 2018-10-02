@@ -48,6 +48,8 @@
 #include "device_relay.h"
 #include "device_photoInterrupter.h"
 #include "device_PIRsensor.h"
+#include "device_buzzer.h"
+#include "device_button.h"
 #include "stateMachine.h"
 /* USER CODE END Includes */
 
@@ -55,8 +57,8 @@
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-uint8_t TxBuffer[] = "Interrupt!\n";
-UART_HandleTypeDef huart2;
+UART_HandleTypeDef huart1;
+UART_HandleTypeDef* phuart1;
 
 USER_ACTION* tCurrent_state;
 /* USER CODE END PV */
@@ -68,7 +70,7 @@ void SystemClock_Config(void);
 /* Private function prototypes -----------------------------------------------*/
 
 void testLEDinit(void);
-//static void EXTI0_1_IRQHandler_Config(void);
+static void EXTI1_IRQHandler_Config(void);
 static void EXTI4_IRQHandler_Config(void);
 static void EXTI9_5_IRQHandler_Config(void);
 /* USER CODE END PFP */
@@ -86,7 +88,6 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
   /* USER CODE END 1 */
 
   /* MCU Configuration----------------------------------------------------------*/
@@ -95,35 +96,48 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
   /* USER CODE END Init */
 
   /* Configure the system clock */
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-  //  EXTI0_1_IRQHandler_Config();
-
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
-//  MX_GPIO_Init();
+#if 0	// for testing
+  MX_GPIO_Init();
+  MX_USART1_UART_Init();
+
+#else
+  /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
+
   MX_I2C1_Init();
   MX_TIM2_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
+
+  EXTI1_IRQHandler_Config();
   EXTI4_IRQHandler_Config();
   EXTI9_5_IRQHandler_Config();
-#if 1
+
   LED_Init(RED_LED, GREEN_LED, BLUE_LED);
-//  PB_Init(BUTTON_USER, BUTTON_MODE_EXTI);
+  //  PB_Init(BUTTON_USER, BUTTON_MODE_EXTI);
   PIS_Init(PIS1);
   PIS_Init(PIS2);
   PIR_Sensor_Init(PIR_SENSOR1);
   Relay_Init(RELAY1);
   Relay_Init(RELAY2);
+  //BUZZER_Init(BUZZER_INTERNAL);
+  Buzzer_Init(BUZZER_EXTERNAL);
+  Button_Init(EMERGENCY_BUTTON);
+
 #endif
   /* USER CODE END 2 */
 
@@ -135,12 +149,12 @@ int main(void)
 
   changeingState = initialize_state();
 
-  uint8_t Welcome[] = "Welcome";
-  HAL_UART_Transmit(&huart1, (uint8_t*)Welcome, sizeof(Welcome), 10);		// TESTING
+  //uint8_t Welcome[] = "Welcome";
+  //HAL_UART_Transmit(&huart1, (uint8_t*)Welcome, sizeof(Welcome), 10);		// TESTING
+  printf("Welcome!!");
 
 #if 1
   testLEDinit();
-//  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET);
 #endif
 
   while(1)
@@ -221,73 +235,78 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-#if 0
-static void EXTI0_1_IRQHandler_Config(void) {		// User Button
-	/*Enable and set EXTI lines 0 to 1 Interrupt to the lowest priority */
-	HAL_NVIC_SetPriority(EXTI0_1_IRQn, 2, 0);
-	HAL_NVIC_EnableIRQ(EXTI0_1_IRQn);
+static void EXTI1_IRQHandler_Config(void) {			// Emergency Button
+	/*Enable and set EXTI lines 1 Interrupt to the lowest priority */
+	HAL_NVIC_SetPriority(EXTI1_IRQn, 2, 0);
+	HAL_NVIC_EnableIRQ(EXTI1_IRQn);
 }
-#endif
 
-static void EXTI4_IRQHandler_Config(void) {		//exteranl Photo Interrupter
+static void EXTI4_IRQHandler_Config(void) {			//exteranl Photo Interrupter
 	/*Enable and set EXTI lines 2 to 3 Interrupt*/
-	HAL_NVIC_SetPriority(EXTI4_IRQn, 2, 0);
+	HAL_NVIC_SetPriority(EXTI4_IRQn, 3, 0);
 	HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 }
 
 static void EXTI9_5_IRQHandler_Config(void) {		// Inner Photo Interrupter // PIR Motion Sensor
 	/*Enable and set EXTI lines 4 to 15 Interrupt*/
-	HAL_NVIC_SetPriority(EXTI9_5_IRQn, 3, 0);
+	HAL_NVIC_SetPriority(EXTI9_5_IRQn, 4, 0);
 	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t Action) {
 
-	uint8_t EXT_DOOR_close[] = "EXT_DOOR_CLOSE";
-	uint8_t EXT_DOOR_open[] = "EXT_DOOR_OPEN";
-	uint8_t INNER_DOOR_close[] = "INNER_DOOR_CLOSE";
-	uint8_t INNER_DOOR_open[] = "INNER_DOOR_OPEN";
-	uint8_t MOTION_detect[] = "MOTION_DETECT";
-
-
 	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_11);
 
-	switch(HAL_GPIO_ReadPin(EXT_DOOR_PORT, EXT_DOOR_PIN)) {
-		case GPIO_PIN_SET	:
-			HAL_UART_Transmit(&huart1, (uint8_t*)EXT_DOOR_close, sizeof(EXT_DOOR_close), 10);		// TESTING
-			extdoor_status = EXT_DOOR_CLOSE;
-			break;
+	if(Action == EXT_DOOR_PIN) {
+		switch(HAL_GPIO_ReadPin(EXT_DOOR_PORT, EXT_DOOR_PIN)) {
+			case GPIO_PIN_SET	:
+				extdoor_status = EXT_DOOR_CLOSE;
+				break;
 
-		case GPIO_PIN_RESET	:
-			HAL_UART_Transmit(&huart1, (uint8_t*)EXT_DOOR_open, sizeof(EXT_DOOR_open), 10);		// TESTING
-			extdoor_status = EXT_DOOR_OPEN;
-			break;
+			case GPIO_PIN_RESET	:
+				extdoor_status = EXT_DOOR_OPEN;
+				break;
 
-		default		:	// exception
-			extdoor_status = EXT_DOOR_CLOSE;
-			break;
+			default		:	// exception
+				extdoor_status = EXT_DOOR_CLOSE;
+				break;
+		}
 	}
 
-	switch(HAL_GPIO_ReadPin(INNER_DOOR_PORT, INNER_DOOR_PIN)) {
-		case GPIO_PIN_SET	:
-			HAL_UART_Transmit(&huart1, (uint8_t*)INNER_DOOR_close, sizeof(INNER_DOOR_close), 10);		// TESTING
-			innerdoor_state = INNER_DOOR_CLOSE;
-			break;
+	if(Action == INNER_DOOR_PIN) {
+		switch(HAL_GPIO_ReadPin(INNER_DOOR_PORT, INNER_DOOR_PIN)) {
+			case GPIO_PIN_SET	:
+				innerdoor_state = INNER_DOOR_CLOSE;
+				break;
 
-		case GPIO_PIN_RESET	:
-			HAL_UART_Transmit(&huart1, (uint8_t*)INNER_DOOR_open, sizeof(INNER_DOOR_open), 10);		// TESTING
-			innerdoor_state = INNER_DOOR_OPEN;
-			break;
+			case GPIO_PIN_RESET	:
+				innerdoor_state = INNER_DOOR_OPEN;
+				break;
 
-		default		:	// exception
-			innerdoor_state = INNER_DOOR_CLOSE;
-			break;
+			default		:	// exception
+				innerdoor_state = INNER_DOOR_CLOSE;
+				break;
+		}
 	}
 
 	if(Action == MOTION_DETECTING) {
-		HAL_UART_Transmit(&huart1, (uint8_t*)MOTION_detect, sizeof(MOTION_detect), 10);		// TESTING
 		baby_state = BABY_IN;
 	}
+
+	if(Action == BUTTON_EMERGENCY) {
+		switch(HAL_GPIO_ReadPin(BUTTON_1_PORT, BUTTON_EMERGENCY)) {
+			case GPIO_PIN_SET	:
+				changeingState = recovery_state();
+				break;
+
+			case GPIO_PIN_RESET	:
+				break;
+
+			default		:	// exception
+				break;
+		}
+	}
+
 }
 
 /* USER CODE END 4 */
